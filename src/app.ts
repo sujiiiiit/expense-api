@@ -122,36 +122,23 @@ interface CustomRequest extends Request {
   user?: { id: string };
 }
 
-// Add expense endpoint
-app.post("/api/expenses", authenticateToken, async (req: CustomRequest, res: Response) => {
-  const { userId, dateTime, amount, type, category, title, currency, note } = req.body;
-
-  if (!userId || !dateTime || !amount || !type || !category || !title || !currency) {
-    return res.status(400).json({ error: "All fields are required" });
-  }
-
-  try {
-    const newExpense = { userId, dateTime, amount, type, category, title, currency, note };
-    const result = await expensesCollection.insertOne(newExpense);
-    const insertedExpense = await expensesCollection.findOne({ _id: result.insertedId });
-    res.status(201).json(insertedExpense);
-  } catch (error: any) {
-    console.error("Add expense error:", error);
-    res.status(500).json({ error: "Error adding expense", details: error.message });
-  }
-});
-
-// Get expenses endpoint
-app.get("/api/expenses/:userId", authenticateToken, async (req: CustomRequest, res: Response) => {
+// Get expenses by userId endpoint
+app.get("/api/expenses/:userId", authenticateToken, async (req: Request, res: Response) => {
   const { userId } = req.params;
 
+  if (!userId) {
+    return res.status(400).json({ error: "User ID is required" });
+  }
+
   try {
-    // Fetch all expenses for the given userId
     const expenses = await expensesCollection.find({ userId }).toArray();
-    res.json({ expenses });
-  } catch (error) {
-    console.error("Get expenses error:", error);
-    res.status(500).json({ error: "Failed to fetch expenses", details: error });
+    if (expenses.length === 0) {
+      return res.status(404).json({ message: "No expenses found for this user" });
+    }
+    res.status(200).json(expenses);
+  } catch (error: any) {
+    console.error("Error retrieving expenses:", error);
+    res.status(500).json({ error: "Error retrieving expenses", details: error.message });
   }
 });
 

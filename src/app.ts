@@ -22,17 +22,20 @@ const allowCors = (fn: (req: Request, res: Response, next: NextFunction) => Prom
       'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
     );
 
+    // Handle preflight requests
     if (req.method === 'OPTIONS') {
-      res.status(200).end();
+      res.status(204).end();
       return;
     }
 
+    // Proceed with the actual request
     await fn(req, res, next);
   };
 
+
 // Middleware
 app.use(express.json());
-app.use(allowCors((req, res, next) => next()));
+app.use(allowCors(async (req, res, next) => next()));
 
 // MongoDB Setup
 const uri = process.env.MONGODB_URI;

@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from "express";
-import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
+import { MongoClient, ServerApiVersion } from "mongodb";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
@@ -141,35 +141,17 @@ app.post("/api/expenses", authenticateToken, async (req: CustomRequest, res: Res
   }
 });
 
-
-// Get expenses by userId endpoint with pagination and sorting
+// Get expenses endpoint
 app.get("/api/expenses/:userId", authenticateToken, async (req: CustomRequest, res: Response) => {
   const { userId } = req.params;
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
-  const skip = (page - 1) * limit;
-  const sortField = req.query.sortField as string || "dateTime";
-  const sortOrder = req.query.sortOrder === "desc" ? -1 : 1;
 
   try {
-    const expenses = await expensesCollection
-      .find({ userId })
-      .sort({ [sortField]: sortOrder })
-      .skip(skip)
-      .limit(limit)
-      .toArray();
-    const totalExpenses = await expensesCollection.countDocuments({ userId });
-    const totalPages = Math.ceil(totalExpenses / limit);
-
-    res.json({
-      expenses,
-      page,
-      totalPages,
-      totalExpenses,
-    });
-  } catch (error: any) {
+    // Fetch all expenses for the given userId
+    const expenses = await expensesCollection.find({ userId }).toArray();
+    res.json({ expenses });
+  } catch (error) {
     console.error("Get expenses error:", error);
-    res.status(500).json({ error: "Error fetching expenses", details: error.message });
+    res.status(500).json({ error: "Failed to fetch expenses", details: error });
   }
 });
 

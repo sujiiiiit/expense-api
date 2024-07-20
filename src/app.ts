@@ -3,6 +3,7 @@ import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import cors from "cors";
 
 dotenv.config();
 
@@ -11,6 +12,14 @@ const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
+app.use(
+  cors({
+    origin: "*", // Replace '*' with specific origins if needed
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    allowedHeaders: "Content-Type,Authorization",
+    credentials: true,
+  })
+);
 
 const uri = process.env.MONGODB_URI;
 if (!uri) {

@@ -10,11 +10,10 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware
 app.use(express.json());
 app.use(
   cors({
-    origin: "*", // Replace '*' with specific origins if needed
+    origin: "*",
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
     allowedHeaders: "Content-Type,Authorization",
     credentials: true,
@@ -33,20 +32,18 @@ const client = new MongoClient(uri, {
   },
 });
 
-// Connect to MongoDB
 const connectDB = async () => {
   try {
     await client.connect();
     console.log("MongoDB connected");
   } catch (err) {
     console.error("MongoDB connection error:", err);
-    process.exit(1); // Exit process with failure
+    process.exit(1);
   }
 };
 
 connectDB();
 
-// Get the database
 const db = client.db("expense-tracker");
 const usersCollection = db.collection("users");
 
@@ -61,20 +58,26 @@ const generateToken = (userId: string) => {
 
 // Signup endpoint
 app.post("/api/signup", async (req: Request, res: Response) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
+  const { email, password, firstName, lastName } = req.body;
+  if (!email || !password || !firstName || !lastName) {
+    return res
+      .status(400)
+      .json({
+        error: "Email, password, first name, and last name are required",
+      });
   }
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = { email, password: hashedPassword };
+    const newUser = { email, password: hashedPassword, firstName, lastName };
     const result = await usersCollection.insertOne(newUser);
     const token = generateToken(result.insertedId.toHexString());
     res.status(201).json({ token });
   } catch (error: any) {
     console.error("Signup error:", error);
-    res.status(500).json({ error: "Error creating user", details: error.message });
+    res
+      .status(500)
+      .json({ error: "Error creating user", details: error.message });
   }
 });
 
@@ -90,7 +93,8 @@ app.post("/api/login", async (req: Request, res: Response) => {
     if (!user) return res.status(400).json({ message: "User not found" });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+    if (!isMatch)
+      return res.status(400).json({ message: "Invalid credentials" });
 
     const token = generateToken(user._id.toHexString());
     res.json({ token });
@@ -117,24 +121,6 @@ const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
     next();
   });
 };
-
-// Get current user
-app.get(
-  "/api/current",
-  authenticateToken,
-  async (req: CustomRequest, res: Response) => {
-    try {
-      const user = await usersCollection.findOne(
-        { _id: new ObjectId(req.user?.id) },
-        { projection: { password: 0 } }
-      );
-      res.json(user);
-    } catch (error: any) {
-      console.error("Fetch current user error:", error);
-      res.status(500).json({ error: "Error fetching user", details: error.message });
-    }
-  }
-);
 
 interface CustomRequest extends Request {
   user?: { id: string };

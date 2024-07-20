@@ -1,21 +1,41 @@
+// Import necessary modules
 import express, { Request, Response, NextFunction } from "express";
 import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
-import cors from "cors";
 
+// Load environment variables
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Custom CORS Middleware
+const allowCors = (fn: (req: Request, res: Response, next: NextFunction) => Promise<void> | void) => 
+  async (req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Customize as needed
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    );
+
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+
+    await fn(req, res, next);
+  };
+
 // Middleware
 app.use(express.json());
-app.use(cors());
+app.use(allowCors((req, res, next) => next()));
 
+// MongoDB Setup
 const uri = process.env.MONGODB_URI;
-console.log(uri)
 if (!uri) {
   throw new Error("MONGODB_URI is not defined");
 }

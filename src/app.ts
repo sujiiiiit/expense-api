@@ -46,6 +46,7 @@ connectDB();
 
 const db = client.db("expense-tracker");
 const usersCollection = db.collection("users");
+const expensesCollection = db.collection("expenses");
 
 // Generate JWT Token
 const generateToken = (userId: string) => {
@@ -60,11 +61,9 @@ const generateToken = (userId: string) => {
 app.post("/api/signup", async (req: Request, res: Response) => {
   const { email, password, firstName, lastName } = req.body;
   if (!email || !password || !firstName || !lastName) {
-    return res
-      .status(400)
-      .json({
-        error: "Email, password, first name, and last name are required",
-      });
+    return res.status(400).json({
+      error: "Email, password, first name, and last name are required",
+    });
   }
 
   try {
@@ -75,9 +74,7 @@ app.post("/api/signup", async (req: Request, res: Response) => {
     res.status(201).json({ token });
   } catch (error: any) {
     console.error("Signup error:", error);
-    res
-      .status(500)
-      .json({ error: "Error creating user", details: error.message });
+    res.status(500).json({ error: "Error creating user", details: error.message });
   }
 });
 
@@ -93,8 +90,7 @@ app.post("/api/login", async (req: Request, res: Response) => {
     if (!user) return res.status(400).json({ message: "User not found" });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(400).json({ message: "Invalid credentials" });
+    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
     const token = generateToken(user._id.toHexString());
     res.json({ token });
@@ -125,6 +121,57 @@ const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
 interface CustomRequest extends Request {
   user?: { id: string };
 }
+
+// Add expense endpoint
+app.post("/api/expenses", authenticateToken, async (req: CustomRequest, res: Response) => {
+  const { userId, dateTime, amount, type, category, title, currency, note } = req.body;
+
+  if (!userId || !dateTime || !amount || !type || !category || !title || !currency) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+
+  try {
+    const newExpense = { userId, dateTime, amount, type, category, title, currency, note };
+    const result = await expensesCollection.insertOne(newExpense);
+    const insertedExpense = await expensesCollection.findOne({ _id: result.insertedId });
+    res.status(201).json(insertedExpense);
+  } catch (error: any) {
+    console.error("Add expense error:", error);
+    res.status(500).json({ error: "Error adding expense", details: error.message });
+  }
+});
+
+
+// Get expenses by userId endpoint with pagination and sorting
+app.get("/api/expenses/:userId", authenticateToken, async (req: CustomRequest, res: Response) => {
+  const { userId } = req.params;
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+  const skip = (page - 1) * limit;
+  const sortField = req.query.sortField as string || "dateTime";
+  const sortOrder = req.query.sortOrder === "desc" ? -1 : 1;
+
+  try {
+    const expenses = await expensesCollection
+      .find({ userId })
+      .sort({ [sortField]: sortOrder })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+    const totalExpenses = await expensesCollection.countDocuments({ userId });
+    const totalPages = Math.ceil(totalExpenses / limit);
+
+    res.json({
+      expenses,
+      page,
+      totalPages,
+      totalExpenses,
+    });
+  } catch (error: any) {
+    console.error("Get expenses error:", error);
+    res.status(500).json({ error: "Error fetching expenses", details: error.message });
+  }
+});
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);

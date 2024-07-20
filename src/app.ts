@@ -46,7 +46,7 @@ connectDB();
 
 const db = client.db("expense-tracker");
 const usersCollection = db.collection("users");
-const expensesCollection = db.collection("expenses");
+const expensesCollection = db.collection("expenses-tracker");
 
 // Generate JWT Token
 const generateToken = (userId: string) => {

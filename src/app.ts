@@ -56,7 +56,7 @@ const generateToken = (userId: string) => {
   if (!secret) {
     throw new Error("JWT_SECRET is not defined");
   }
-  return jwt.sign({ id: userId }, secret, { expiresIn: "1h" });
+  return jwt.sign({ id: userId }, secret, { expiresIn: "100h" });
 };
 
 // Signup endpoint
@@ -74,9 +74,7 @@ app.post("/api/signup", async (req: Request, res: Response) => {
     res.status(201).json({ token });
   } catch (error: any) {
     console.error("Signup error:", error);
-    res
-      .status(500)
-      .json({ error: "Error creating user", details: error.message });
+    res.status(500).json({ error: "Error creating user", details: error.message });
   }
 });
 
@@ -92,8 +90,7 @@ app.post("/api/login", async (req: Request, res: Response) => {
     if (!user) return res.status(400).json({ message: "User not found" });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(400).json({ message: "Invalid credentials" });
+    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
     const token = generateToken(user._id.toHexString());
     res.json({ token });
@@ -134,9 +131,7 @@ app.get(
       res.json(user);
     } catch (error: any) {
       console.error("Fetch current user error:", error);
-      res
-        .status(500)
-        .json({ error: "Error fetching user", details: error.message });
+      res.status(500).json({ error: "Error fetching user", details: error.message });
     }
   }
 );
@@ -144,5 +139,9 @@ app.get(
 interface CustomRequest extends Request {
   user?: { id: string };
 }
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
 
 export default app;

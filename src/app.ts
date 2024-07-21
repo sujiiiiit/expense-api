@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from "express";
-import { MongoClient, ServerApiVersion } from "mongodb";
+import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
@@ -46,7 +46,7 @@ connectDB();
 
 const db = client.db("expense-tracker");
 const usersCollection = db.collection("users");
-const expensesCollection = db.collection("expenses-tracker");
+const expensesCollection = db.collection("expense-tracker");
 
 // Generate JWT Token
 const generateToken = (userId: string) => {
@@ -74,7 +74,9 @@ app.post("/api/signup", async (req: Request, res: Response) => {
     res.status(201).json({ token });
   } catch (error: any) {
     console.error("Signup error:", error);
-    res.status(500).json({ error: "Error creating user", details: error.message });
+    res
+      .status(500)
+      .json({ error: "Error creating user", details: error.message });
   }
 });
 
@@ -90,7 +92,8 @@ app.post("/api/login", async (req: Request, res: Response) => {
     if (!user) return res.status(400).json({ message: "User not found" });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+    if (!isMatch)
+      return res.status(400).json({ message: "Invalid credentials" });
 
     const token = generateToken(user._id.toHexString());
     res.json({ token });
@@ -121,29 +124,40 @@ const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
 interface CustomRequest extends Request {
   user?: { id: string };
 }
-
-// Get expenses by userId endpoint
-app.get("/api/expenses/:userId", authenticateToken, async (req: Request, res: Response) => {
-  const { userId } = req.params;
+app.post("/api/expenses", authenticateToken, async (req: Request, res: Response) => {
+  const { userId, month, year } = req.body;
 
   if (!userId) {
-    return res.status(400).json({ error: "User ID is required" });
+    return res.status(400).json({ error: "userId is required" });
   }
 
   try {
-    const expenses = await expensesCollection.find({ userId }).toArray();
-    if (expenses.length === 0) {
-      return res.status(404).json({ message: "No expenses found for this user" });
+    let query: any = { userId };
+
+    if (month && year) {
+      const startDate = new Date(`${year}-${month}-01T00:00:00Z`);
+      const endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 10); // 10 days from startDate
+
+      query.dateTime = {
+        $gte: startDate.toISOString(),
+        $lt: endDate.toISOString(),
+      };
     }
-    res.status(200).json(expenses);
+
+    const expenses = await expensesCollection
+      .find(query)
+      .sort({ dateTime: -1 })
+      .toArray();
+    
+    res.json(expenses);
   } catch (error: any) {
-    console.error("Error retrieving expenses:", error);
-    res.status(500).json({ error: "Error retrieving expenses", details: error.message });
+    console.error("Fetch expenses error:", error);
+    res.status(500).json({ error: "Error fetching expenses", details: error.message });
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+
+
 
 export default app;

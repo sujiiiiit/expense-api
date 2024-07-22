@@ -1,14 +1,11 @@
-import express, { Request, Response, NextFunction } from "express";
+import express, { Request, Response } from "express";
 import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import cors from "cors";
 
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(
@@ -45,88 +42,104 @@ const connectDB = async () => {
 connectDB();
 
 const db = client.db("expense-tracker");
-const usersCollection = db.collection("users");
-const expensesCollection = db.collection("expense-tracker");
+const expenseCollection = db.collection("expense-tracker");
 
-// Generate JWT Token
-const generateToken = (userId: string) => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error("JWT_SECRET is not defined");
-  }
-  return jwt.sign({ id: userId }, secret, { expiresIn: "100h" });
-};
-
-// Signup endpoint
-app.post("/api/signup", async (req: Request, res: Response) => {
-  const { email, password, firstName, lastName } = req.body;
-  if (!email || !password || !firstName || !lastName) {
-    return res.status(400).json({
-      error: "Email, password, first name, and last name are required",
-    });
-  }
-
+app.post("/add", async (req: Request, res: Response) => {
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = { email, password: hashedPassword, firstName, lastName };
-    const result = await usersCollection.insertOne(newUser);
-    const token = generateToken(result.insertedId.toHexString());
-    res.status(201).json({ token });
-  } catch (error: any) {
-    console.error("Signup error:", error);
-    res
-      .status(500)
-      .json({ error: "Error creating user", details: error.message });
+    const { userId, dateTime, amount, type, category, title, currency, note } =
+      req.body;
+
+    if (
+      !userId ||
+      !dateTime ||
+      !amount ||
+      !type ||
+      !category ||
+      !title ||
+      !currency
+    ) {
+      return res
+        .status(400)
+        .json({ message: "All required fields must be filled" });
+    }
+
+    const newTransaction = {
+      userId,
+      dateTime: new Date(dateTime),
+      amount,
+      type,
+      category,
+      title,
+      currency,
+      note,
+    };
+
+    const result = await expenseCollection.insertOne(newTransaction);
+    res.status(201).json(result);
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error", error });
   }
 });
 
-// Login endpoint
-app.post("/api/login", async (req: Request, res: Response) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
-  }
-
+// Endpoint to update an expense
+app.put("/edit/:id", async (req: Request, res: Response) => {
   try {
-    const user = await usersCollection.findOne({ email });
-    if (!user) return res.status(400).json({ message: "User not found" });
+    const { id } = req.params;
+    const { userId, dateTime, amount, type, category, title, currency, note } =
+      req.body;
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(400).json({ message: "Invalid credentials" });
+    if (
+      !userId ||
+      !dateTime ||
+      !amount ||
+      !type ||
+      !category ||
+      !title ||
+      !currency
+    ) {
+      return res
+        .status(400)
+        .json({ message: "All required fields must be filled" });
+    }
 
-    const token = generateToken(user._id.toHexString());
-    res.json({ token });
-  } catch (error: any) {
-    console.error("Login error:", error);
-    res.status(500).json({ error: "Error logging in", details: error.message });
+    const updatedTransaction = {
+      userId,
+      dateTime: new Date(dateTime),
+      amount,
+      type,
+      category,
+      title,
+      currency,
+      note,
+    };
+
+    const result = await expenseCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updatedTransaction }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Transaction not found" });
+    }
+
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error", error });
   }
 });
 
-// Middleware to check token
-const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
-  if (!token) return res.sendStatus(401);
-
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error("JWT_SECRET is not defined");
+app.delete("/api/remove/:id", async (req, res) => {
+  const expenseId = new ObjectId(req.params.id);
+  try {
+    await expenseCollection.deleteOne({ _id: expenseId });
+    res.status(200).send({ message: "Expense deleted successfully" });
+  } catch (error) {
+    res.status(500).send({ error: "Failed to delete expense" });
   }
+});
 
-  jwt.verify(token, secret, (err, user) => {
-    if (err) return res.sendStatus(403);
-    (req as CustomRequest).user = user as { id: string };
-    next();
-  });
-};
-
-interface CustomRequest extends Request {
-  user?: { id: string };
-}
-app.post("/api/expenses", authenticateToken, async (req: Request, res: Response) => {
+app.post("/api/expenses", async (req: Request, res: Response) => {
   const { userId, month, year } = req.body;
-
   if (!userId) {
     return res.status(400).json({ error: "userId is required" });
   }
@@ -137,7 +150,7 @@ app.post("/api/expenses", authenticateToken, async (req: Request, res: Response)
     if (month && year) {
       const startDate = new Date(`${year}-${month}-01T00:00:00Z`);
       const endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + 10); // 10 days from startDate
+      endDate.setDate(startDate.getDate() + 31); // 10 days from startDate
 
       query.dateTime = {
         $gte: startDate.toISOString(),
@@ -145,19 +158,35 @@ app.post("/api/expenses", authenticateToken, async (req: Request, res: Response)
       };
     }
 
-    const expenses = await expensesCollection
+    const expenses = await expenseCollection
       .find(query)
       .sort({ dateTime: -1 })
       .toArray();
-    
-    res.json(expenses);
+
+    res.json(expenses); // Only one response is sent here
   } catch (error: any) {
     console.error("Fetch expenses error:", error);
-    res.status(500).json({ error: "Error fetching expenses", details: error.message });
+    res
+      .status(500)
+      .json({ error: "Error fetching expenses", details: error.message });
   }
 });
 
+// Endpoint to get an expense by ID
+app.get("/expense/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
 
+    const expense = await expenseCollection.findOne({ _id: new ObjectId(id) });
 
+    if (!expense) {
+      return res.status(404).json({ message: "Transaction not found" });
+    }
+
+    res.status(200).json(expense);
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error", error });
+  }
+});
 
 export default app;

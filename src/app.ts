@@ -44,7 +44,7 @@ connectDB();
 const db = client.db("expense-tracker");
 const expenseCollection = db.collection("expense-tracker");
 
-app.post("/add", async (req: Request, res: Response) => {
+app.post("/api/add", async (req: Request, res: Response) => {
   try {
     const { userId, dateTime, amount, type, category, title, currency, note } =
       req.body;
@@ -82,7 +82,7 @@ app.post("/add", async (req: Request, res: Response) => {
 });
 
 // Endpoint to update an expense
-app.put("/edit/:id", async (req: Request, res: Response) => {
+app.put("/api/edit/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { userId, dateTime, amount, type, category, title, currency, note } =

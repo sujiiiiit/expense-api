@@ -65,7 +65,7 @@ app.post("/api/add", async (req: Request, res: Response) => {
 
     const newTransaction = {
       userId,
-      dateTime: new Date(dateTime),
+      dateTime: dateTime,
       amount,
       type,
       category,
@@ -104,7 +104,7 @@ app.put("/api/edit/:id", async (req: Request, res: Response) => {
 
     const updatedTransaction = {
       userId,
-      dateTime: new Date(dateTime),
+      dateTime: dateTime,
       amount,
       type,
       category,

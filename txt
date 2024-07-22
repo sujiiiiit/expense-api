@@ -1,0 +1,19 @@
+
+_id
+669e4a5c7995a0136dd1b4c2
+userId
+"si2nfh"
+dateTime
+2024-07-22T00:00:00.000+00:00
+amount
+2323
+type
+"Income"
+category
+"Rent"
+title
+"sujit dwivedi"
+currency
+"EUR"
+note
+"adadasd"
